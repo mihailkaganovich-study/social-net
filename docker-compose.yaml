@@ -36,7 +36,7 @@ services:
       SPRING_DATASOURCE_USERNAME: study_user
       SPRING_DATASOURCE_PASSWORD: study_password
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-      JWT_SECRET: ${JWT_SECRET:-123456789}
+      JWT_SECRET: ${JWT_SECRET:-mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
     ports:
       - "8081:8081"

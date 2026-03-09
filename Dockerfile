@@ -1,5 +1,4 @@
 # Dockerfile
-#FROM openjdk:17-jdk-slim AS build
 FROM openjdk:17.0.1-jdk-slim AS build
 # Установка Maven
 RUN apt-get update && apt-get install -y maven
@@ -14,7 +13,6 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Финальный образ
-#FROM openjdk:17-jdk-slim
 FROM openjdk:17.0.1-jdk-slim
 
 WORKDIR /app
