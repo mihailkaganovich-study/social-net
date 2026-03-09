@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: study_postgres
+    environment:
+      POSTGRES_DB: study_db
+      POSTGRES_USER: study_user
+      POSTGRES_PASSWORD: study_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - study_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study_user -d study_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: study_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/study_db
+      SPRING_DATASOURCE_USERNAME: study_user
+      SPRING_DATASOURCE_PASSWORD: study_password
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      JWT_SECRET: ${JWT_SECRET:-123456789}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+    ports:
+      - "8081:8081"
+    networks:
+      - study_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: study_postgres_data
+
+networks:
+  study_network:
+    name: study_network
+    driver: bridge
