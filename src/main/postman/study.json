@@ -1,0 +1,117 @@
+{
+  "info": {
+    "name": "study",
+    "description": null,
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "login",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "",
+        "url": {
+          "raw": "http://127.0.0.1:8081/api/login",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1:8081"
+          ],
+          "path": [
+            "api",
+            "login"
+          ],
+          "query": [],
+          "variable": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"d11cb8f6-4ae8-418a-ad5a-d8de6edd6fdc\",\n  \"password\": \"987654321\"\n}\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "/user/register",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "",
+        "url": {
+          "raw": "http://127.0.0.1:8081/api/user/register",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1:8081"
+          ],
+          "path": [
+            "api",
+            "user",
+            "register"
+          ],
+          "query": [],
+          "variable": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"first_name\": \"Александр\",\n    \"second_name\": \"Александров\",\n    \"birthdate\": \"1991-11-01\",\n    \"biography\": \"Дизайнер\",\n    \"city\": \"Мурманск\",\n    \"password\": \"987654321\"\n  }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "/user/get",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "",
+        "url": {
+          "raw": "http://127.0.0.1:8081/api/user/get/:id",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1:8081"
+          ],
+          "path": [
+            "api",
+            "user",
+            "get",
+            ":id"
+          ],
+          "query": [],
+          "variable": [
+            {
+              "key": "id",
+              "value": "d11cb8f6-4ae8-418a-ad5a-d8de6edd6fdc"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "variable": []
+}
