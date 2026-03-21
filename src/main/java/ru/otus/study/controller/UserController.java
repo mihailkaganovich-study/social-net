@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,5 +59,12 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(404, "User not found"));
         }
+    }
+    // Поиск пользователей по имени
+    @GetMapping("/user/search")
+    public ResponseEntity<List<User>> search(
+            @RequestParam String firstName, @RequestParam String secondName) {
+        List<User> users = userService.search(firstName,secondName);
+            return ResponseEntity.ok(users);
     }
 }

@@ -7,8 +7,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Types;
-import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,6 +23,8 @@ public class UserRepository {
     @Autowired
     public UserRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.userRowMapper = new UserRowMapper();
+        /*
         this.userRowMapper = (rs, rowNum) -> {
             User user = new User();
             user.setId(UUID.fromString(rs.getString("id")));
@@ -35,7 +39,9 @@ public class UserRepository {
             user.setBiography(rs.getString("biography"));
             user.setCity(rs.getString("city"));
             return user;
+
         };
+         */
     }
 
     public UUID save(User user) {
@@ -98,5 +104,33 @@ public class UserRepository {
     public void deleteById(UUID id) {
         String sql = "DELETE FROM users WHERE id = ?";
         jdbcTemplate.update(sql, id);
+    }
+
+    public List<User> search(String firstName, String secondName){
+        String sql = "SELECT id, first_name, second_name, birthdate, biography, city " +
+                "FROM users WHERE first_name LIKE ? AND second_name LIKE ? " +
+                "ORDER BY id";
+        String firstNamePattern = "%" + firstName + "%";
+        String secondNamePattern= "%" + secondName + "%";
+        return jdbcTemplate.query(sql, userRowMapper, firstNamePattern, secondNamePattern);
+    }
+    // RowMapper для преобразования ResultSet в User
+    private static class UserRowMapper implements RowMapper<User> {
+        @Override
+        public User mapRow(ResultSet rs, int rowNum) throws SQLException {
+            User user = new User();
+            user.setId(UUID.fromString(rs.getString("id")));
+            user.setFirstName(rs.getString("first_name"));
+            user.setSecondName(rs.getString("second_name"));
+
+            if (rs.getDate("birthdate") != null) {
+                user.setBirthdate(rs.getDate("birthdate").toLocalDate());
+            }
+
+            user.setBiography(rs.getString("biography"));
+            user.setCity(rs.getString("city"));
+
+            return user;
+        }
     }
 }
