@@ -1,0 +1,160 @@
+services:
+  # ==================== PostgreSQL Master ====================
+  pg-master:
+    image: postgres:15-alpine
+    container_name: pgmaster
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: study_user
+      POSTGRES_PASSWORD: study_password
+      POSTGRES_DB: study_db
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256 --encoding=UTF-8"
+    volumes:
+      - master-data:/var/lib/postgresql/data
+      - ./master-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - study_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study_user -d study_db"]
+      #test: ["CMD-SHELL", "psql -U study_user -d postgres -c 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==================== PostgreSQL Slave 1 ====================
+  pg-slave1:
+    image: postgres:15-alpine
+    container_name: pgslave1
+    restart: unless-stopped
+    volumes:
+      - slave1-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - study_network
+    depends_on:
+      pg-master:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: study_user
+      POSTGRES_PASSWORD: study_password
+      PGPASSWORD: study_password
+    command: >
+      sh -c "
+      echo 'Waiting for master...';
+      until pg_isready -h pg-master -p 5432 -U study_user -d postgres; do
+        sleep 2;
+      done;
+      echo 'Check standby.signal...';
+      if [ ! -f /var/lib/postgresql/data/standby.signal ] ; then
+        echo 'Master ready, cleaning data directory...';
+        rm -rf /var/lib/postgresql/data/* 2>/dev/null || true;
+        
+        echo 'Running first pg_basebackup...';
+        pg_basebackup -h pg-master -p 5432 -U study_user -D /var/lib/postgresql/data -Fp -Xs -P -R -v -d 'application_name=pgslave1';
+        
+        echo 'Setting correct permissions...';
+        chmod 0700 /var/lib/postgresql/data;
+        chown -R postgres:postgres /var/lib/postgresql/data;
+      else
+        echo 'Skip first backup...';
+      fi;
+      echo 'Starting PostgreSQL slave...';
+      exec gosu postgres postgres \
+        -c primary_conninfo='host=pg-master port=5432 user=study_user password=study_password application_name=pgslave1' \
+        -c hot_standby=on
+      "
+
+  # ==================== PostgreSQL Slave 2 ====================
+  pg-slave2:
+    image: postgres:15-alpine
+    container_name: pgslave2
+    restart: always
+    volumes:
+      - slave2-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - study_network
+    depends_on:
+      pg-master:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: study_user
+      POSTGRES_PASSWORD: study_password
+      PGPASSWORD: study_password
+    command: >
+      sh -c "
+      echo 'Waiting for master...';
+      until pg_isready -h pg-master -p 5432 -U study_user -d postgres; do
+        sleep 2;
+      done;
+      echo 'Check standby.signal...';
+      if [ ! -f /var/lib/postgresql/data/standby.signal ] ; then
+        echo 'Master ready, cleaning data directory...';
+        rm -rf /var/lib/postgresql/data/* 2>/dev/null || true;
+      
+        echo 'Running first pg_basebackup...';
+        pg_basebackup -h pg-master -p 5432 -U study_user -D /var/lib/postgresql/data -Fp -Xs -P -R -v -d 'application_name=pgslave2';
+      
+        echo 'Setting correct permissions...';
+        chmod 0700 /var/lib/postgresql/data;
+        chown -R postgres:postgres /var/lib/postgresql/data;
+      else
+        echo 'Skip first backup...';
+      fi;
+      echo 'Starting PostgreSQL slave...';
+      exec gosu postgres postgres \
+        -c primary_conninfo='host=pg-master port=5432 user=study_user password=study_password application_name=pgslave2' \
+        -c hot_standby=on
+      "
+
+  # ==================== Spring Boot Application ====================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: study_app
+    depends_on:
+      pg-master:
+        condition: service_healthy
+#      pg-slave1:
+#        condition: service_started
+#      pg-slave2:
+#        condition: service_started
+    environment:
+      # Мастер для записи
+      SPRING_DATASOURCE_URL: jdbc:postgresql://pg-master:5432/study_db
+      SPRING_DATASOURCE_USERNAME: study_user
+      SPRING_DATASOURCE_PASSWORD: study_password
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+
+      # Конфигурация для чтения со слейвов (если используете Spring Data с read-only)
+      SPRING_DATASOURCE_SECONDARY_URL: jdbc:postgresql://pg-slave1:5432,pg-slave2:5432/study_db?loadBalanceHosts=true&hostRecheckSeconds=10
+      SPRING_DATASOURCE_SECONDARY_USERNAME: study_user
+      SPRING_DATASOURCE_SECONDARY_PASSWORD: study_password
+
+      JWT_SECRET: ${JWT_SECRET:-mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+    ports:
+      - "8081:8081"
+    networks:
+      - study_network
+    restart: unless-stopped
+
+volumes:
+  master-data:
+    name: pg_master_data
+  slave1-data:
+    name: pg_slave1_data
+  slave2-data:
+    name: pg_slave2_data
+
+networks:
+  study_network:
+    name: study_network
+    external: true
+    driver: bridge

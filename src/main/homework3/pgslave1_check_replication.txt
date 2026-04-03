@@ -1,0 +1,5 @@
+study_db=# select application_name, client_addr,sync_state from pg_stat_replication;
+ application_name | client_addr | sync_state
+------------------+-------------+------------
+ pgslave2         | 172.18.0.4  | quorum
+(1 row)

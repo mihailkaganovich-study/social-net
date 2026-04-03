@@ -1,0 +1,6 @@
+study_db=# select client_addr, application_name, sync_state from pg_stat_replication;
+ client_addr | application_name | sync_state
+-------------+------------------+------------
+ 172.18.0.5  | pgslave2         | potential
+ 172.18.0.4  | pgslave1         | sync
+(2 rows)

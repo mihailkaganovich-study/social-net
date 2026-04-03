@@ -1,0 +1,5 @@
+study_db=# select * from test where id=1000000;
+   id
+---------
+ 1000000
+(1 row)

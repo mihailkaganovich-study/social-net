@@ -1,0 +1,7 @@
+$ docker exec -it pgmaster psql -U study_user -d study_db -c 'select application_name, client_addr,sync_state from pg_stat_replication;'
+Password for user study_user:
+ application_name | client_addr | sync_state
+------------------+-------------+------------
+ walreceiver      | 172.18.0.4  | async
+ walreceiver      | 172.18.0.5  | async
+(2 rows)

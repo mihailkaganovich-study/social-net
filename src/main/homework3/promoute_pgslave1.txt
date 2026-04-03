@@ -1,0 +1,19 @@
+study_db=# select pg_promote();
+ pg_promote
+------------
+ t
+(1 row)
+
+study_db=# select max(id) from test;
+  max
+--------
+ 999988
+(1 row)
+
+study_db=# insert into test values(1000000);
+INSERT 0 1
+study_db=# select max(id) from test;
+   max
+---------
+ 1000000
+(1 row)

@@ -1,0 +1,11 @@
+$ docker exec -it pgslave1 psql -U study_user -d study_db -c "select * from test;"
+  id
+-------
+     1
+ (1 rows)
+
+$ docker exec -it pgslave2 psql -U study_user -d study_db -c "select * from test;"
+  id
+-------
+     1
+(1 rows)

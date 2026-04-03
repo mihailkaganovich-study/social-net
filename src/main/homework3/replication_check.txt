@@ -1,0 +1,11 @@
+$ docker exec -it pgslave1 psql -U study_user -d study_db -c "select * from users where id='62886c9c-2a65-47ea-bd92-df29373bd709';"
+                  id                  | first_name | second_name | birthdate  | biography |   city   |                        password_hash                         |          created_at           |          updated_at
+--------------------------------------+------------+-------------+------------+-----------+----------+--------------------------------------------------------------+-------------------------------+-------------------------------
+ 62886c9c-2a65-47ea-bd92-df29373bd709 | Александр  | Александров | 1991-11-01 | Дизайнер  | Мурманск | $2a$06$6Ql1seZLOUg0MskdbbDJ1.JNlXng/oq3lbXAL8T..WFqaL4Zq/aRi | 2026-04-02 05:47:30.548773+00 | 2026-04-02 05:47:30.548773+00
+(1 row)
+
+$ docker exec -it pgslave2 psql -U study_user -d study_db -c "select * from users where id='62886c9c-2a65-47ea-bd92-df29373bd709';"
+                  id                  | first_name | second_name | birthdate  | biography |   city   |                        password_hash                         |          created_at           |          updated_at
+--------------------------------------+------------+-------------+------------+-----------+----------+--------------------------------------------------------------+-------------------------------+-------------------------------
+ 62886c9c-2a65-47ea-bd92-df29373bd709 | Александр  | Александров | 1991-11-01 | Дизайнер  | Мурманск | $2a$06$6Ql1seZLOUg0MskdbbDJ1.JNlXng/oq3lbXAL8T..WFqaL4Zq/aRi | 2026-04-02 05:47:30.548773+00 | 2026-04-02 05:47:30.548773+00
+(1 row)

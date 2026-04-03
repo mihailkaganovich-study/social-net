@@ -6,6 +6,7 @@ import ru.otus.study.model.User;
 import ru.otus.study.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,7 +14,7 @@ import java.util.UUID;
 
 @Service
 public class UserService {
-    
+
     private final UserRepository userRepository;
     private final JwtService jwtService;
 
@@ -23,6 +24,7 @@ public class UserService {
         this.jwtService = jwtService;
     }
 
+    @Transactional
     public UUID register(RegisterRequest request) {
         User user = new User();
         user.setFirstName(request.getFirstName());
@@ -31,10 +33,12 @@ public class UserService {
         user.setBiography(request.getBiography());
         user.setCity(request.getCity());
         user.setPassword(request.getPassword());
-        
+
         return userRepository.save(user);
     }
-    public Optional<String> login(LoginRequest loginRequest){
+
+    @Transactional(readOnly = true)
+    public Optional<String> login(LoginRequest loginRequest) {
         UUID userId = loginRequest.getId();
         String password = loginRequest.getPassword();
 
@@ -43,12 +47,14 @@ public class UserService {
         }
 
         return Optional.empty();
-
     }
+
+    @Transactional(readOnly = true)
     public Optional<User> getUserById(UUID id) {
         return userRepository.findById(id);
     }
 
+    @Transactional(readOnly = true)
     public boolean validateUserPassword(UUID userId, String password) {
         if (!userRepository.existsById(userId)) {
             return false;
@@ -56,7 +62,8 @@ public class UserService {
         return userRepository.validatePassword(userId, password);
     }
 
-    public List<User> search(String firstName, String secondName){
-        return userRepository.search(firstName,secondName);
+    @Transactional(readOnly = true)
+    public List<User> search(String firstName, String secondName) {
+        return userRepository.search(firstName, secondName);
     }
 }

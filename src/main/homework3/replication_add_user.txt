@@ -1,0 +1,12 @@
+$curl --request POST \
+   --url http://127.0.0.1:8081/api/user/register \
+   --header 'content-type: application/json' \
+   --data '{
+   "first_name": "Александр",
+   "second_name": "Александров",
+   "birthdate": "1991-11-01",
+   "biography": "Дизайнер",
+   "city": "Мурманск",
+   "password": "987654321"
+ }'
+ {"user_id":"62886c9c-2a65-47ea-bd92-df29373bd709"}
