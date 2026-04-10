@@ -1,23 +1,27 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/study_db
-    username: study_user
-    password: study_password
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/study_db}
+    username: ${SPRING_DATASOURCE_USERNAME:study_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:study_password}
     driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      connection-timeout: 30000
-
   jackson:
     date-format: yyyy-MM-dd
     serialization:
       write-dates-as-timestamps: false
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:redis_password}
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
 
 jwt:
-  secret: mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!
-  expiration: 86400000 # 24 hours in milliseconds
-
+  secret: ${JWT_SECRET:mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
+  expiration: ${JWT_EXPIRATION:86400000}
 server:
   port: 8081
   error:
