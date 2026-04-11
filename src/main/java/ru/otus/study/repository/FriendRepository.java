@@ -37,7 +37,7 @@ public class FriendRepository {
     }
 
     public List<UUID> findFriendIds(UUID userId) {
-        String sql = "SELECT friend_id FROM friends WHERE user_id = ?";
+        String sql = "SELECT friend_id FROM friends WHERE user_id = ? ";
         return jdbcTemplate.query(sql,
                 (rs, rowNum) -> UUID.fromString(rs.getString("friend_id")),
                 userId);
