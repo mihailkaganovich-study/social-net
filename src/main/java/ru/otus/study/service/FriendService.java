@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.otus.study.model.Post;
 import ru.otus.study.repository.FriendRepository;
 import ru.otus.study.repository.PostRepository;
 
@@ -28,8 +29,14 @@ public class FriendService {
         friendRepository.addFriend(userId, friendId);
         log.info("User {} added friend {}", userId, friendId);
 
-        // При добавлении друга, обновляем ленту пользователя
-        updateUserFeedWithFriendPosts(userId, friendId);
+        // Получаем последние посты нового друга
+        List<UUID> newFriendOnly = List.of(friendId);
+        List<Post> friendPosts = postRepository.findRecentPostsByUserIds(newFriendOnly, 100);
+
+        // Добавляем посты нового друга в ленту пользователя
+        if (!friendPosts.isEmpty()) {
+            feedCacheService.warmUpFeedForNewFriend(userId, friendId, friendPosts);
+        }
     }
 
     @Transactional
@@ -37,7 +44,7 @@ public class FriendService {
         friendRepository.removeFriend(userId, friendId);
         log.info("User {} removed friend {}", userId, friendId);
 
-        // При удалении друга, перестраиваем ленту пользователя
+        // Полностью перестраиваем ленту пользователя без постов удаленного друга
         rebuildUserFeed(userId);
     }
 
@@ -45,20 +52,16 @@ public class FriendService {
         return friendRepository.findFriendIds(userId);
     }
 
-    private void updateUserFeedWithFriendPosts(UUID userId, UUID friendId) {
-        // Получаем последние посты нового друга и добавляем их в ленту
-        List<UUID> friendIds = List.of(friendId);
-        var recentPosts = postRepository.findRecentPostsByUserIds(friendIds, 100);
-
-        // Прогреваем кеш для пользователя с постами нового друга
-        List<UUID> allFriendIds = friendRepository.findFriendIds(userId);
-        var allFriendPosts = postRepository.findRecentPostsByUserIds(allFriendIds, 1000);
-        feedCacheService.warmUpFeed(userId, allFriendPosts);
-    }
-
     private void rebuildUserFeed(UUID userId) {
         List<UUID> friendIds = friendRepository.findFriendIds(userId);
-        var allFriendPosts = postRepository.findRecentPostsByUserIds(friendIds, 1000);
-        feedCacheService.warmUpFeed(userId, allFriendPosts);
+
+        if (friendIds.isEmpty()) {
+            // Если друзей нет, очищаем ленту
+            feedCacheService.rebuildUserFeed(userId, List.of());
+        } else {
+            // Иначе загружаем посты всех друзей
+            List<Post> allFriendPosts = postRepository.findRecentPostsByUserIds(friendIds, 1000);
+            feedCacheService.rebuildUserFeed(userId, allFriendPosts);
+        }
     }
 }
