@@ -30,7 +30,7 @@ public class PostService {
         // Получаем список друзей автора
         List<UUID> friendIds = friendRepository.findFriendIds(authorUserId);
 
-        // Добавляем пост в ленты друзей
+        // Добавляем пост в ленты всех друзей
         if (!friendIds.isEmpty()) {
             feedCacheService.addPostToFriendsFeeds(post, friendIds);
         }
@@ -47,10 +47,12 @@ public class PostService {
 
         log.info("User {} updated post {}", authorUserId, postId);
 
-        // Обновляем пост в лентах друзей
+        // Получаем список друзей автора
         List<UUID> friendIds = friendRepository.findFriendIds(authorUserId);
+
+        // Обновляем пост в лентах друзей
         if (!friendIds.isEmpty()) {
-            feedCacheService.updatePostInFeeds(post);
+            feedCacheService.updatePostInFriendsFeeds(post, friendIds);
         }
 
         return convertToDto(post);
@@ -58,7 +60,6 @@ public class PostService {
 
     @Transactional
     public void deletePost(UUID postId, UUID authorUserId) {
-        // Получаем пост перед удалением для получения списка друзей
         Post post = postRepository.findById(postId);
         if (post == null || !post.getAuthorUserId().equals(authorUserId)) {
             throw new IllegalArgumentException("Post not found or you are not the author");
@@ -71,10 +72,12 @@ public class PostService {
 
         log.info("User {} deleted post {}", authorUserId, postId);
 
-        // Удаляем пост из лент друзей
+        // Получаем список друзей автора
         List<UUID> friendIds = friendRepository.findFriendIds(authorUserId);
+
+        // Удаляем пост из лент друзей
         if (!friendIds.isEmpty()) {
-            feedCacheService.removePostFromFeeds(postId, friendIds);
+            feedCacheService.removePostFromFriendsFeeds(postId, friendIds);
         }
     }
 
@@ -90,7 +93,7 @@ public class PostService {
         // Пробуем получить ленту из кеша
         List<PostDto> cachedFeed = feedCacheService.getFeed(userId, offset, limit);
 
-        if (!cachedFeed.isEmpty() || offset > 0) {
+        if (!cachedFeed.isEmpty()) {
             return cachedFeed;
         }
 
@@ -101,7 +104,7 @@ public class PostService {
         }
 
         List<Post> posts = postRepository.findRecentPostsByUserIds(friendIds, 1000);
-        feedCacheService.warmUpFeed(userId, posts);
+        feedCacheService.rebuildUserFeed(userId, posts);
 
         // Возвращаем запрошенную страницу
         return posts.stream()
