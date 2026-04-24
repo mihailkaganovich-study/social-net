@@ -19,6 +19,37 @@ spring:
         max-idle: 8
         min-idle: 0
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    partitions: ${SPRING_KAFKA_PARTITIONS:5}
+    replicas: ${SPRING_KAFKA_REPLICAS:1}
+    consumer:
+      group-id: social-net-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 100
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "ru.otus.study.dto"
+        spring.json.type.mapping: |
+          postMessage:ru.otus.study.dto.PostMessage,
+          feedUpdateTask:ru.otus.study.dto.FeedUpdateTask
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: 1
+      retries: 3
+      properties:
+        spring.json.type.mapping: |
+          postMessage:ru.otus.study.dto.PostMessage,
+          feedUpdateTask:ru.otus.study.dto.FeedUpdateTask
+    listener:
+      ack-mode: manual
+      concurrency: 5
+    admin:
+      auto-create: true
+
 jwt:
   secret: ${JWT_SECRET:mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
   expiration: ${JWT_EXPIRATION:86400000}

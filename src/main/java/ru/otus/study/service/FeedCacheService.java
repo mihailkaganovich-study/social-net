@@ -23,7 +23,33 @@ public class FeedCacheService {
     private static final String FEED_KEY_PREFIX = "feed:";
     private static final int MAX_FEED_SIZE = 1000;
     private static final long FEED_TTL_HOURS = 24;
+    /**
+     * Добавляет пост в ленту конкретного пользователя
+     */
+    public void addPostToUserFeed(UUID userId, Post post) {
+        if (!isRedisAvailable()) {
+            log.warn("Redis unavailable, skipping feed update for user {}", userId);
+            return;
+        }
 
+        String feedKey = getFeedKey(userId);
+        PostDto postDto = convertToDto(post);
+
+        try {
+            // Добавляем пост в начало ленты
+            redisTemplate.opsForList().leftPush(feedKey, postDto);
+
+            // Обрезаем до MAX_FEED_SIZE
+            redisTemplate.opsForList().trim(feedKey, 0, MAX_FEED_SIZE - 1);
+
+            // Обновляем TTL
+            redisTemplate.expire(feedKey, FEED_TTL_HOURS, TimeUnit.HOURS);
+
+            log.debug("Added post {} to feed of user {}", post.getId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to add post to feed cache for user {}: {}", userId, e.getMessage());
+        }
+    }
     /**
      * Добавление поста в ленты всех друзей автора
      */
@@ -194,10 +220,30 @@ public class FeedCacheService {
         }
     }
 
+// ru/otus/study/service/FeedCacheService.java (дополнительные методы)
+
+    /**
+     * Очищает ленту пользователя
+     */
+    public void clearUserFeed(UUID userId) {
+        if (!isRedisAvailable()) {
+            log.warn("Redis unavailable, skipping feed clear for user {}", userId);
+            return;
+        }
+
+        String feedKey = getFeedKey(userId);
+        try {
+            redisTemplate.delete(feedKey);
+            log.debug("Cleared feed for user {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to clear feed for user {}: {}", userId, e.getMessage());
+        }
+    }
+
     /**
      * Полная перестройка ленты пользователя
      */
-    public void rebuildUserFeed(UUID userId, List<Post> allFriendPosts) {
+    public void rebuildUserFeed(UUID userId, List<Post> posts) {
         if (!isRedisAvailable()) {
             log.debug("Redis unavailable, skipping feed rebuild for user {}", userId);
             return;
@@ -205,23 +251,29 @@ public class FeedCacheService {
 
         String feedKey = getFeedKey(userId);
         try {
+            // Удаляем старую ленту
             redisTemplate.delete(feedKey);
 
-            if (!allFriendPosts.isEmpty()) {
-                List<PostDto> postDtos = allFriendPosts.stream()
+            if (!posts.isEmpty()) {
+                // Сортируем посты по дате (новые первыми)
+                List<PostDto> postDtos = posts.stream()
+                        .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
                         .map(this::convertToDto)
                         .collect(Collectors.toList());
 
+                // Сохраняем в Redis
                 redisTemplate.opsForList().rightPushAll(feedKey, postDtos);
                 redisTemplate.expire(feedKey, FEED_TTL_HOURS, TimeUnit.HOURS);
 
                 log.info("Rebuilt feed for user {} with {} posts", userId, postDtos.size());
+            } else {
+                log.info("Rebuilt empty feed for user {}", userId);
             }
         } catch (Exception e) {
             log.error("Failed to rebuild feed for user {}: {}", userId, e.getMessage());
+            throw new RuntimeException("Failed to rebuild user feed", e);
         }
     }
-
     private List<PostDto> getFeed(UUID userId) {
         String feedKey = getFeedKey(userId);
         try {
@@ -253,6 +305,59 @@ public class FeedCacheService {
         }
     }
 
+    /**
+     * Обновляет пост в ленте пользователя
+     */
+    public void updatePostInUserFeed(UUID userId, Post post) {
+        if (!isRedisAvailable()) {
+            return;
+        }
+
+        String feedKey = getFeedKey(userId);
+        try {
+            List<PostDto> feed = getFeed(userId);
+            List<PostDto> updatedFeed = feed.stream()
+                    .map(p -> p.getId().equals(post.getId()) ? convertToDto(post) : p)
+                    .collect(Collectors.toList());
+
+            redisTemplate.delete(feedKey);
+            if (!updatedFeed.isEmpty()) {
+                redisTemplate.opsForList().rightPushAll(feedKey, updatedFeed);
+                redisTemplate.expire(feedKey, FEED_TTL_HOURS, TimeUnit.HOURS);
+            }
+
+            log.debug("Updated post {} in feed of user {}", post.getId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to update post in feed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Удаляет пост из ленты пользователя
+     */
+    public void removePostFromUserFeed(UUID userId, UUID postId) {
+        if (!isRedisAvailable()) {
+            return;
+        }
+
+        String feedKey = getFeedKey(userId);
+        try {
+            List<PostDto> feed = getFeed(userId);
+            List<PostDto> updatedFeed = feed.stream()
+                    .filter(p -> !p.getId().equals(postId))
+                    .collect(Collectors.toList());
+
+            redisTemplate.delete(feedKey);
+            if (!updatedFeed.isEmpty()) {
+                redisTemplate.opsForList().rightPushAll(feedKey, updatedFeed);
+                redisTemplate.expire(feedKey, FEED_TTL_HOURS, TimeUnit.HOURS);
+            }
+
+            log.debug("Removed post {} from feed of user {}", postId, userId);
+        } catch (Exception e) {
+            log.error("Failed to remove post from feed: {}", e.getMessage());
+        }
+    }
     private PostDto convertToDto(Post post) {
         return PostDto.builder()
                 .id(post.getId())

@@ -5,8 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.otus.study.dto.PostDto;
+import ru.otus.study.dto.PostMessage;
 import ru.otus.study.model.Post;
-import ru.otus.study.repository.FriendRepository;
 import ru.otus.study.repository.PostRepository;
 
 import java.util.List;
@@ -19,22 +19,21 @@ import java.util.stream.Collectors;
 public class PostService {
 
     private final PostRepository postRepository;
-    private final FriendRepository friendRepository;
-    private final FeedCacheService feedCacheService;
+    private final FeedUpdateProducer feedUpdateProducer;
 
     @Transactional
     public PostDto createPost(UUID authorUserId, String text) {
+        // 1. Сохраняем пост в БД
         Post post = postRepository.create(authorUserId, text);
         log.info("User {} created post {}", authorUserId, post.getId());
 
-        // Получаем список друзей автора
-        List<UUID> friendIds = friendRepository.findFriendIds(authorUserId);
+        // 2. Отправляем событие в Kafka и сразу возвращаем ответ
+        PostMessage postMessage = PostMessage.from(convertToDto(post));
+        feedUpdateProducer.publishPostCreated(postMessage);
 
-        // Добавляем пост в ленты всех друзей
-        if (!friendIds.isEmpty()) {
-            feedCacheService.addPostToFriendsFeeds(post, friendIds);
-        }
+        log.debug("Published post created event for post {}", post.getId());
 
+        // 3. Сразу возвращаем ответ клиенту
         return convertToDto(post);
     }
 
@@ -47,13 +46,9 @@ public class PostService {
 
         log.info("User {} updated post {}", authorUserId, postId);
 
-        // Получаем список друзей автора
-        List<UUID> friendIds = friendRepository.findFriendIds(authorUserId);
-
-        // Обновляем пост в лентах друзей
-        if (!friendIds.isEmpty()) {
-            feedCacheService.updatePostInFriendsFeeds(post, friendIds);
-        }
+        // Отправляем событие обновления в Kafka
+        PostMessage postMessage = PostMessage.from(convertToDto(post));
+        feedUpdateProducer.publishPostUpdated(postMessage);
 
         return convertToDto(post);
     }
@@ -72,13 +67,8 @@ public class PostService {
 
         log.info("User {} deleted post {}", authorUserId, postId);
 
-        // Получаем список друзей автора
-        List<UUID> friendIds = friendRepository.findFriendIds(authorUserId);
-
-        // Удаляем пост из лент друзей
-        if (!friendIds.isEmpty()) {
-            feedCacheService.removePostFromFriendsFeeds(postId, friendIds);
-        }
+        // Отправляем событие удаления в Kafka
+        feedUpdateProducer.publishPostDeleted(postId, authorUserId);
     }
 
     public PostDto getPost(UUID postId) {
@@ -90,28 +80,8 @@ public class PostService {
     }
 
     public List<PostDto> getFeed(UUID userId, int offset, int limit) {
-        // Пробуем получить ленту из кеша
-        List<PostDto> cachedFeed = feedCacheService.getFeed(userId, offset, limit);
-
-        if (!cachedFeed.isEmpty()) {
-            return cachedFeed;
-        }
-
-        // Если кеш пустой, загружаем из БД и прогреваем кеш
-        List<UUID> friendIds = friendRepository.findFriendIds(userId);
-        if (friendIds.isEmpty()) {
-            return List.of();
-        }
-
-        List<Post> posts = postRepository.findRecentPostsByUserIds(friendIds, 1000);
-        feedCacheService.rebuildUserFeed(userId, posts);
-
-        // Возвращаем запрошенную страницу
-        return posts.stream()
-                .skip(offset)
-                .limit(limit)
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
+        // Лента всегда берется из кеша, который обновляется асинхронно через Kafka
+        return feedUpdateProducer.getFeedFromCache(userId, offset, limit);
     }
 
     private PostDto convertToDto(Post post) {
