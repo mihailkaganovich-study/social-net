@@ -21,13 +21,11 @@ spring:
 
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    partitions: ${SPRING_KAFKA_PARTITIONS:5}
-    replicas: ${SPRING_KAFKA_REPLICAS:1}
     consumer:
       group-id: social-net-group
       auto-offset-reset: earliest
       enable-auto-commit: false
-      max-poll-records: 100
+      max-poll-records: 1  # Для одиночных - 1, для batch - 100
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
@@ -46,10 +44,15 @@ spring:
           feedUpdateTask:ru.otus.study.dto.FeedUpdateTask
     listener:
       ack-mode: manual
-      concurrency: 5
     admin:
       auto-create: true
 
+app:
+  celebrity:
+    threshold: 10        # Количество постов
+    window-minutes: 5    # За период (минут)
+    batch-size: 100      # Размер батча для обновления
+    materialize-delay: 1000  # Задержка перед материализацией (мс)
 jwt:
   secret: ${JWT_SECRET:mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
   expiration: ${JWT_EXPIRATION:86400000}

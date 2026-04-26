@@ -1,3 +1,4 @@
+// ru/otus/study/config/KafkaConfig.java
 package ru.otus.study.config;
 
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -12,8 +13,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import ru.otus.study.dto.FeedUpdateTask;
 import ru.otus.study.dto.PostMessage;
 
 import java.util.HashMap;
@@ -29,7 +32,8 @@ public class KafkaConfig {
     private int partitions;
 
     @Value("${spring.kafka.replicas:1}")
-    private int replicas;
+    private short replicas;
+
     // ==== Топики ====
 
     @Bean
@@ -43,7 +47,7 @@ public class KafkaConfig {
     @Bean
     public NewTopic feedUpdateTopic() {
         return TopicBuilder.name("feed.update")
-                .partitions(partitions)
+                .partitions(partitions * 2)
                 .replicas(replicas)
                 .build();
     }
@@ -81,7 +85,7 @@ public class KafkaConfig {
         return new KafkaTemplate<>(producerFactory());
     }
 
-    // ==== Consumer ====
+    // ==== Consumer Factory ====
 
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
@@ -91,18 +95,57 @@ public class KafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "ru.otus.study.dto");
+        props.put(JsonDeserializer.TYPE_MAPPINGS,
+                "postMessage:ru.otus.study.dto.PostMessage," +
+                        "feedUpdateTask:ru.otus.study.dto.FeedUpdateTask");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
         return new DefaultKafkaConsumerFactory<>(props);
     }
+
+    // ==== Контейнер для одиночных сообщений (post.created, post.updated, post.deleted) ====
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
+        factory.setConcurrency(3);
+        // ОТКЛЮЧАЕМ batch режим
+        factory.setBatchListener(false);
+        // Включаем manual ack
+        factory.getContainerProperties().setAckMode(
+                org.springframework.kafka.listener.ContainerProperties.AckMode.MANUAL);
+        return factory;
+    }
+
+    // ==== Контейнер для батчей (feed.update) ====
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> batchFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
         factory.setConcurrency(5);
+        // ВКЛЮЧАЕМ batch режим для feed.update
         factory.setBatchListener(true);
+        factory.getContainerProperties().setAckMode(
+                org.springframework.kafka.listener.ContainerProperties.AckMode.MANUAL);
+        return factory;
+    }
+
+    // ==== Контейнер для материализации (feed.materialize) ====
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> materializeFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        factory.setConcurrency(1);
+        factory.setBatchListener(false);
+        factory.getContainerProperties().setAckMode(
+                org.springframework.kafka.listener.ContainerProperties.AckMode.MANUAL);
         return factory;
     }
 }
