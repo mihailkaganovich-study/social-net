@@ -23,3 +23,10 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+
+tarantool:
+  host: ${TARANTOOL_HOST:tarantool}
+  port: ${TARANTOOL_PORT:3301}
+  # Не заполняйте, если tarantool запущен без авторизации
+  username: ${TARANTOOL_USERNAME:}
+  password: ${TARANTOOL_PASSWORD:}

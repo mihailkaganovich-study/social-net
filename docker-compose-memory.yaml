@@ -1,0 +1,74 @@
+x-auth-variables: &AUTH
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: postgres
+  PGUSER: postgres
+  PGPASSWORD: postgres
+  POSTGRES_HOST_AUTH_METHOD: trust
+
+services:
+
+  postgres:
+    container_name: "study_postgres"
+    image: "postgres:15-alpine"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - study_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study_user -d study_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+
+  tarantool:
+    image: tarantool/tarantool:2.11
+    volumes:
+      - ./tarantool/init.lua:/opt/tarantool/init.lua
+    # The official image supports running a Lua script from /opt/tarantool
+    command: ["/opt/tarantool/init.lua"]
+    ports:
+      - "3301:3301"
+    networks:
+      - study_network
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: study_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tarantool:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://otus_citus_master:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      JWT_SECRET: ${JWT_SECRET:-mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      TARANTOOL_HOST: tarantool
+      TARANTOOL_PORT: 3301
+    ports:
+      - "8081:8081"
+    networks:
+      - study_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: study_postgres_data
+
+networks:
+  study_network:
+    name: study_network
+    driver: bridge
+    external: true
