@@ -1,9 +1,6 @@
 package ru.otus.study.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import ru.otus.study.controller.tarantool.TarantoolDialogController;
 import ru.otus.study.model.DialogMessage;
 import ru.otus.study.repository.tarantool.TarantoolConnectionRepository;
 
@@ -57,8 +54,9 @@ public class DialogTarantoolService {
                 offset
         );
 
-        List<DialogMessage> result = new ArrayList<>(rawRows.size());
-        for (Object rawRow : rawRows) {
+        List<?> rows = normalizeRows(rawRows);
+        List<DialogMessage> result = new ArrayList<>(rows.size());
+        for (Object rawRow : rows) {
             DialogMessage parsed = parseRow(rawRow);
             result.add(parsed);
         }
@@ -75,6 +73,26 @@ public class DialogTarantoolService {
                 currentUserId.toString(),
                 readAtMs
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<?> normalizeRows(List<?> rawRows) {
+        if (rawRows.isEmpty()) {
+            return rawRows;
+        }
+
+        // Tarantool client may wrap Lua return into one top-level element: [ [row1, row2, ...] ]
+        if (rawRows.size() == 1 && rawRows.get(0) instanceof List<?> nested) {
+            if (nested.isEmpty()) {
+                return nested;
+            }
+            Object firstNested = nested.get(0);
+            if (firstNested instanceof List<?> || firstNested instanceof Object[]) {
+                return nested;
+            }
+        }
+
+        return rawRows;
     }
 
     private DialogMessage parseRow(Object rawRow) {
@@ -151,4 +169,5 @@ public class DialogTarantoolService {
         message.setCreatedAt(Instant.ofEpochMilli(createdAtMs));
         message.setReadAt(readAt);
         return message;
-    }}
+    }
+}

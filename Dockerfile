@@ -27,5 +27,5 @@ USER appuser
 # Порт приложения
 EXPOSE 8081
 
-# Запуск приложения
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# `cartridge-driver` uses msgpack internals requiring sun.nio.ch access on JDK 17
+ENTRYPOINT ["java", "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED", "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", "-jar", "app.jar"]

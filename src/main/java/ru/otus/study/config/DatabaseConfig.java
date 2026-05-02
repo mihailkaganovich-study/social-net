@@ -36,12 +36,6 @@ public class DatabaseConfig {
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
 
-        // Оптимизации для Citus
-        config.addDataSourceProperty("reWriteBatchedInserts", "true");
-        config.addDataSourceProperty("prepareThreshold", "0");
-        config.addDataSourceProperty("preparedStatementCacheQueries", "256");
-        config.addDataSourceProperty("preparedStatementCacheSizeMiB", "5");
-
         return new HikariDataSource(config);
     }
 

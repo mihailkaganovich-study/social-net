@@ -4,18 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
-import ru.otus.study.controller.DialogController;
 import ru.otus.study.model.DialogMessage;
-import ru.otus.study.repository.tarantool.TarantoolConnectionRepository;
-import ru.otus.study.service.DialogService;
 import ru.otus.study.service.DialogTarantoolService;
 import ru.otus.study.service.JwtService;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -55,7 +48,7 @@ public class TarantoolDialogController {
             return ResponseEntity.badRequest()
                     .body(new TarantoolDialogController.ErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            log.info(Arrays.toString(e.getStackTrace()));
+            log.error("Failed to send message via Tarantool UDF", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new TarantoolDialogController.ErrorResponse("Failed to send message"));
         }
@@ -87,6 +80,7 @@ public class TarantoolDialogController {
             return ResponseEntity.ok(messages);
 
         } catch (Exception e) {
+            log.error("Failed to retrieve messages via Tarantool UDF", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new TarantoolDialogController.ErrorResponse("Failed to retrieve messages"));
         }

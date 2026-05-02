@@ -76,7 +76,7 @@ box.once('init_dialogs_space', function()
     })
 end)
 
-local function dialog_save_message(dialog_id, message_id, from_user_id, to_user_id, text, created_at_ms)
+function dialog_save_message(dialog_id, message_id, from_user_id, to_user_id, text, created_at_ms)
     local created_at_ms_num = tonumber(created_at_ms)
     local created_at_rev_ms = -created_at_ms_num
 
@@ -110,7 +110,7 @@ local function dialog_save_message(dialog_id, message_id, from_user_id, to_user_
     return message_id
 end
 
-local function dialog_get_messages(dialog_id, limit, offset)
+function dialog_get_messages(dialog_id, limit, offset)
     limit = tonumber(limit) or 50
     offset = tonumber(offset) or 0
 
@@ -131,7 +131,9 @@ local function dialog_get_messages(dialog_id, limit, offset)
                 tuple[5], -- to_user_id
                 tuple[6], -- text
                 tuple[7], -- created_at_ms
-                read_at_ms ~= 0 and read_at_ms or nil
+                -- Always return a fixed-size tuple for Java parser.
+                -- Lua arrays cannot keep trailing nil; use 0 as "unread".
+                read_at_ms
             }
 
             taken = taken + 1
@@ -144,7 +146,7 @@ local function dialog_get_messages(dialog_id, limit, offset)
     return result
 end
 
-local function dialog_mark_as_read(dialog_id, user_id, read_at_ms)
+function dialog_mark_as_read(dialog_id, user_id, read_at_ms)
     local read_at_ms_num = tonumber(read_at_ms)
     local tuples = box.space.dialog_messages.index.by_dialog_to_read:select({dialog_id, user_id, 0})
 
@@ -161,13 +163,16 @@ end
 
 box.once('init_dialog_udfs', function()
     box.schema.func.create('dialog_save_message', {if_not_exists = true})
-    box.func.dialog_save_message = dialog_save_message
 
     box.schema.func.create('dialog_get_messages', {if_not_exists = true})
-    box.func.dialog_get_messages = dialog_get_messages
 
     box.schema.func.create('dialog_mark_as_read', {if_not_exists = true})
-    box.func.dialog_mark_as_read = dialog_mark_as_read
+end)
+
+-- Dev profile: app connects without credentials, so use guest grants.
+-- Keeps idempotency across restarts/reloads.
+box.once('init_guest_grants', function()
+    box.schema.user.grant('guest', 'read,write,execute', 'universe', nil, {if_not_exists = true})
 end)
 
 -- Script ends here; Tarantool keeps running serving requests.

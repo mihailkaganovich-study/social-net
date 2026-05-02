@@ -90,8 +90,7 @@ services:
     image: tarantool/tarantool:2.11
     volumes:
       - ./tarantool/init.lua:/opt/tarantool/init.lua
-    # The official image supports running a Lua script from /opt/tarantool
-    command: ["/opt/tarantool/init.lua"]
+    command: ["tarantool", "/opt/tarantool/init.lua"]
     ports:
       - "3301:3301"
     networks:
@@ -113,6 +112,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      JDK_JAVA_OPTIONS: --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
       JWT_SECRET: ${JWT_SECRET:-mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       TARANTOOL_HOST: tarantool
