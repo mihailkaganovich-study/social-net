@@ -1,22 +1,27 @@
+x-auth-variables: &AUTH
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: postgres
+  PGUSER: postgres
+  PGPASSWORD: postgres
+  POSTGRES_HOST_AUTH_METHOD: trust
+  POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+
 services:
   postgres:
     image: postgres:15-alpine
     container_name: study_postgres
-    environment:
-      POSTGRES_DB: study_db
-      POSTGRES_USER: study_user
-      POSTGRES_PASSWORD: study_password
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    environment: *AUTH
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./friends_posts_tables.sql:/docker-entrypoint-initdb.d/friends_posts_tables.sql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/0-init.sql
+      - ./friends_posts_tables.sql:/docker-entrypoint-initdb.d/1-friends_posts_tables.sql
     networks:
       - study_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U study_user -d study_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,6 +57,47 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+  postgres-dialogs:
+    image: postgres:15-alpine
+    container_name: dialogs_postgres
+    environment:
+      POSTGRES_USER: dialogs_user
+      POSTGRES_PASSWORD: dialogs_password
+      POSTGRES_DB: dialogs_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - dialogs_postgres_data:/var/lib/postgresql/data
+      - ../social-net-dialogs/dialog_tables.sql:/docker-entrypoint-initdb.d/dialog_tables.sql
+    networks:
+      - study_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dialogs_user -d dialogs_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  dialogs-app:
+    build:
+      context: ../social-net-dialogs
+      dockerfile: Dockerfile
+    container_name: dialogs_app
+    depends_on:
+      postgres-dialogs:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-dialogs:5432/dialogs_db
+      SPRING_DATASOURCE_USERNAME: dialogs_user
+      SPRING_DATASOURCE_PASSWORD: dialogs_password
+      SERVER_PORT: 8083
+    ports:
+      - "8083:8083"
+    networks:
+      - study_network
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -62,10 +108,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      dialogs-app:
+        condition: service_started
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/study_db
-      SPRING_DATASOURCE_USERNAME: study_user
-      SPRING_DATASOURCE_PASSWORD: study_password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
@@ -73,6 +121,7 @@ services:
       SPRING_REDIS_TIMEOUT: 2000ms
       JWT_SECRET: ${JWT_SECRET:-mySuperSecretKeyForJWTTokenGenerationThatIsAtLeast32BytesLong2024!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      DIALOGS_SERVICE_URL: http://dialogs-app:8083
     ports:
       - "8081:8081"
     networks:
@@ -84,6 +133,8 @@ volumes:
     name: study_postgres_data
   redis_data:
     name: study_redis_data
+  dialogs_postgres_data:
+    name: dialogs_postgres_data
 
 networks:
   study_network:

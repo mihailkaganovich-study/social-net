@@ -7,9 +7,9 @@ import org.springframework.web.bind.annotation.*;
 import ru.otus.study.model.DialogMessage;
 import ru.otus.study.service.DialogService;
 import ru.otus.study.service.JwtService;
+import ru.otus.study.web.RequestIdContext;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 @Slf4j
@@ -35,7 +35,8 @@ public class DialogController {
         try {
             String token = extractToken(authHeader);
             UUID currentUserId = jwtService.extractUserId(token);
-            log.info("from_user={} to_user={}",currentUserId,toUserId);
+            log.info("requestId={} from_user={} to_user={}",
+                    RequestIdContext.get(), currentUserId, toUserId);
             DialogMessage message = dialogService.sendMessage(
                     currentUserId,
                     toUserId,
@@ -47,8 +48,12 @@ public class DialogController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest()
                     .body(new ErrorResponse(e.getMessage()));
+        } catch (ru.otus.study.client.DialogRemoteClient.DialogRemoteException e) {
+            log.error("requestId={} dialogs service unavailable", RequestIdContext.get(), e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(new ErrorResponse("Dialogs service unavailable"));
         } catch (Exception e) {
-            log.info(Arrays.toString(e.getStackTrace()));
+            log.error("requestId={} failed to send message", RequestIdContext.get(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Failed to send message"));
         }
@@ -74,12 +79,14 @@ public class DialogController {
                     offset
             );
 
-            // Отмечаем сообщения как прочитанные
-            dialogService.markDialogAsRead(currentUserId, otherUserId);
-
             return ResponseEntity.ok(messages);
 
+        } catch (ru.otus.study.client.DialogRemoteClient.DialogRemoteException e) {
+            log.error("requestId={} dialogs service unavailable", RequestIdContext.get(), e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(new ErrorResponse("Dialogs service unavailable"));
         } catch (Exception e) {
+            log.error("requestId={} failed to retrieve messages", RequestIdContext.get(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Failed to retrieve messages"));
         }

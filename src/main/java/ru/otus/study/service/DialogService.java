@@ -1,10 +1,8 @@
 package ru.otus.study.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import ru.otus.study.client.DialogRemoteClient;
 import ru.otus.study.model.DialogMessage;
-import ru.otus.study.repository.DialogRepository;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,38 +10,21 @@ import java.util.UUID;
 @Service
 public class DialogService {
 
-    private final DialogRepository dialogRepository;
+    private final DialogRemoteClient dialogRemoteClient;
 
-    @Autowired
-    public DialogService(DialogRepository dialogRepository) {
-        this.dialogRepository = dialogRepository;
+    public DialogService(DialogRemoteClient dialogRemoteClient) {
+        this.dialogRemoteClient = dialogRemoteClient;
     }
 
-    @Transactional
     public DialogMessage sendMessage(UUID fromUserId, UUID toUserId, String text) {
-        if (text == null || text.trim().isEmpty()) {
-            throw new IllegalArgumentException("Message text cannot be empty");
-        }
-
-        if (text.length() > 10000) {
-            throw new IllegalArgumentException("Message text too long");
-        }
-
-        DialogMessage message = new DialogMessage(fromUserId, toUserId, text);
-        return dialogRepository.saveMessage(message);
+        return dialogRemoteClient.sendMessage(fromUserId, toUserId, text);
     }
 
     public List<DialogMessage> getDialogMessages(UUID currentUserId, UUID otherUserId) {
-        return dialogRepository.getDialogMessages(currentUserId, otherUserId);
+        return getDialogMessages(currentUserId, otherUserId, 50, 0);
     }
 
     public List<DialogMessage> getDialogMessages(UUID currentUserId, UUID otherUserId, int limit, int offset) {
-        return dialogRepository.getDialogMessages(currentUserId, otherUserId, limit, offset);
-    }
-
-    @Transactional
-    public void markDialogAsRead(UUID currentUserId, UUID otherUserId) {
-        UUID dialogId = DialogMessage.generateDialogId(currentUserId, otherUserId);
-        dialogRepository.markMessagesAsRead(dialogId, currentUserId);
+        return dialogRemoteClient.getDialogMessages(currentUserId, otherUserId, limit, offset);
     }
 }
